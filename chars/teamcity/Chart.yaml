@@ -1,0 +1,11 @@
+apiVersion: v2
+name: teamcity
+description: A Helm chart for deploying JetBrains TeamCity in Kubernetes
+version: 0.1.0
+appVersion: "2025.03.1"
+dependencies:
+  - name: postgresql
+    version: 12.2.6
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+

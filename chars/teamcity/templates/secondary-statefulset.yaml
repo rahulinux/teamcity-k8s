@@ -1,0 +1,140 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "teamcity.fullname" . }}-secondary
+  labels:
+    {{- include "teamcity.labels.secondary" . | nindent 4 }}
+  annotations:
+    {{- toYaml .Values.secondary.annotations | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "teamcity.selectorLabelsSecondary" . | nindent 6 }}
+  serviceName: {{ include "teamcity.name.serviceNameSecondary" . }}
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        {{- include "teamcity.selectorLabelsSecondary" . | nindent 8 }}
+      {{- with .Values.secondary.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.secondary.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.secondary.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.secondary.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: wait-for-main
+          image: curlimages/curl:8.4.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for TeamCity main node to become healthy..."
+              until curl -m 5 -s -o /dev/null -w '%{http_code}' {{ include "teamcity.mainURL" . }}:{{ .Values.service.port }}/healthCheck/healthy | grep -q "200"; do
+                echo "$(date): Main node not ready yet, retrying in 5s..."
+                sleep 5
+              done
+              echo "Main node is healthy, proceeding..."
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+      containers:
+        - name: teamcity-secondary
+          image: {{ .Values.secondary.image.name }}:{{ coalesce .Chart.AppVersion .Values.secondary.image.tag }}
+          imagePullPolicy: "IfNotPresent"
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - containerPort: {{ .Values.service.port }}
+              protocol: TCP
+              name: http
+          resources:
+            {{- toYaml .Values.secondary.resources | nindent 12 }}
+          command: [ "/bin/bash" ]
+          args: 
+          - "-c"
+          - |
+            export TEAMCITY_SERVER_OPTS="-Dteamcity.server.rootURL=http://${HOSTNAME}.{{ .Release.Namespace }}.svc.cluster.local \
+            -Dteamcity.server.nodeId=${HOSTNAME} \
+            -Dteamcity.server.responsibilities={{ join "," .Values.secondary.responsibilities }} \
+            {{ .Values.teamcityGlobalConfigurations.additionalServerOpts }}"
+            exec /run-server.sh
+          env:
+            - name: TEAMCITY_SERVER_MEM_OPTS
+              value: -Xmx{{.Values.teamcityGlobalConfigurations.xmxValue}}
+            {{- if and .Values.persistence.enabled .Values.teamcityGlobalConfigurations.dataDirPath}}
+            - name: "TEAMCITY_DATA_PATH"
+              value: {{.Values.teamcityGlobalConfigurations.dataDirPath}}
+            - name: TEAMCITY_LOGS_PATH
+              value: {{ .Values.teamcityGlobalConfigurations.logDirPathPrefix }}
+            {{- end }}
+            - name: "TEAMCITY_DB_URL"
+              valueFrom:
+                secretKeyRef:
+                  key: url
+                  name: "{{ include "teamcity.name.databaseSecret" . }}"
+            - name: "TEAMCITY_DB_USER"
+              valueFrom:
+                secretKeyRef:
+                  key: username
+                  name: "{{ include "teamcity.name.databaseSecret" . }}"
+            - name: "TEAMCITY_DB_PASSWORD"
+              valueFrom:
+                secretKeyRef:
+                  key: password
+                  name: "{{ include "teamcity.name.databaseSecret" . }}"
+          volumeMounts:
+            - name: shared-nfs-data
+              mountPath: {{ .Values.teamcityGlobalConfigurations.dataDirPath }}
+            - name: logs
+              mountPath: {{ .Values.teamcityGlobalConfigurations.logDirPathPrefix }}
+          livenessProbe:
+            httpGet:
+              path: /healthCheck/healthy
+              port: http
+            periodSeconds: 10
+            failureThreshold: 12
+          readinessProbe:
+            httpGet:
+              path: /mnt/get/stateRevision 
+              # path: /healthCheck/ready
+              port: http
+            periodSeconds: 10
+            failureThreshold: 10
+      volumes:
+      - name: shared-nfs-data
+        persistentVolumeClaim:
+          claimName: {{ include "teamcity.fullname" . }}-shared-data 
+  volumeClaimTemplates:
+    - metadata:
+        name: logs
+      spec:
+        accessModes: [ {{ .Values.persistence.logDir.accessMode }} ]
+        storageClassName: {{ coalesce .Values.persistence.logDir.storageClass .Values.storageClass }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.logDir.size }}

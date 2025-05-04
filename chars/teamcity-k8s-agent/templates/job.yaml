@@ -1,0 +1,97 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "teamcity-k8s-agent.fullname" . }}-register
+  labels:
+    {{- include "teamcity-k8s-agent.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "teamcity-k8s-agent.labels" . | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ include "teamcity-k8s-agent.fullname" . }}-sa
+      containers:
+        - name: init-teamcity
+          image: curlimages/curl:8.7.1
+          env:
+            - name: TEAMCITY_URL
+              value: {{ .Values.teamcity.serverUrl | quote }}
+            - name: TEAMCITY_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: token
+                  name: "{{ include "teamcity-k8s-agent.name.apiToken" . }}"
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -xe
+              TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+              CACERT=$(cat /var/run/secrets/kubernetes.io/serviceaccount/ca.crt | base64 -w 0)
+              {{- range .Values.teamcity.projects }}
+              # Check if the project exists
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+                -H "Authorization: Bearer $TEAMCITY_TOKEN" \
+                "$TEAMCITY_URL/app/rest/projects/id:{{ .id }}")
+              if [ "$STATUS" = "200" ]; then
+                echo "Project {{ .id }} already exists, skipping creation and settings."
+              else
+                echo "Creating project {{ .id }}..."
+                curl -sS -X POST \
+                  -H "Authorization: Bearer $TEAMCITY_TOKEN" \
+                  -H "Content-Type: application/json" \
+                  -d '{"parentProject":{"locator":"id:_Root"},"id":"{{ .id }}","name":"{{ .name }}"}' \
+                  "$TEAMCITY_URL/app/rest/projects"
+                echo "Adding Kubernetes cloud profile to project {{ .id }}..."
+                # Create OAuthProvider feature and capture its ID
+                OAUTH_RESPONSE=$(curl -sS -X POST \
+                  -H "Authorization: Bearer $TEAMCITY_TOKEN" \
+                  -H "Accept: application/json" \
+                  -H "Content-Type: application/json" \
+                  -d '{
+                    "project": { "id": "{{ .id }}" },
+                    "name": "{{ .k8sProfile.name }}",
+                    "cloudCode": "kubernetes",
+                    "type": "OAuthProvider",
+                    "properties": {
+                      "property": [
+                        { "name": "apiServerUrl", "value": "{{ .k8sProfile.apiServerUrl }}" },
+                        { "name": "namespace", "value": "{{ .k8sProfile.namespace }}" },
+                        { "name": "displayName", "value": "Kubernetes Connection" },
+                        { "name": "authStrategy", "value": "token" },
+                        { "name": "providerType", "value": "KubernetesConnection" },
+                        { "name": "secure:caCertData", "value": "'$CACERT'" },
+                        { "name": "secure:authToken", "value": "'$TOKEN'" }
+                      ]
+                    }
+                  }' \
+                  "$TEAMCITY_URL/app/rest/projects/id:{{ .id }}/projectFeatures")
+
+                OAUTH_ID=$(echo "$OAUTH_RESPONSE" | grep -o '"id":"[^"]*"' | cut -d':' -f2 | tr -d '"')
+
+                # Create BuildExecutor feature using the captured OAuthProvider ID and template name
+                curl -sS -X POST \
+                  -H "Authorization: Bearer $TEAMCITY_TOKEN" \
+                  -H "Content-Type: application/json" \
+                  -d '{
+                    "type": "BuildExecutor",
+                    "properties": {
+                      "property": [
+                        { "name": "buildsLimit", "value": "{{ .k8sProfile.buildsLimit }}" },
+                        { "name": "connectionId", "value": "'"$OAUTH_ID"'" },
+                        { "name": "executorType", "value": "KubernetesExecutor" },
+                        { "name": "profileDescription", "value": "k8s agent" },
+                        { "name": "profileName", "value": "k8s agent" },
+                        { "name": "profileServerUrl", "value": "'"$TEAMCITY_URL"'" },
+                        { "name": "containerParameters", "value": "{{ include "joinMap" .k8sProfile.containerParameters }}" },
+                        { "name": "templateName", "value": "{{ .k8sProfile.templateName }}" }
+                      ]
+                    }
+                  }' \
+                  "$TEAMCITY_URL/app/rest/projects/id:{{ .id }}/projectFeatures"
+              fi
+              {{- end }}

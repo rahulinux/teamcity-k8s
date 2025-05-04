@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "teamcity.name.serviceNameMain" . }}
+  labels:
+    {{- include "teamcity.labels.main" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "teamcity.selectorLabelsMain" . | nindent 4 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "teamcity.name.serviceNameSecondary" . }}
+  labels:
+    {{- include "teamcity.labels.secondary" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "teamcity.selectorLabelsSecondary" . | nindent 4 }}

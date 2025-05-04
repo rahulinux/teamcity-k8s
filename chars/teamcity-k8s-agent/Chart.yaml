@@ -1,0 +1,7 @@
+apiVersion: v2
+name: teamcity-k8s-agent
+description: TeamCity Project and Kubernetes Cloud Profile Initializer
+type: application
+version: 0.1.0
+appVersion: "1.0"
+
