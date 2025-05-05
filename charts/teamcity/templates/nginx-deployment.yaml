@@ -13,6 +13,8 @@ spec:
     metadata:
       labels:
         app: {{ include "teamcity.fullname" . }}-nginx
+      annotations:
+        configmap-hash: {{ include (print $.Template.BasePath "/nginx-configmap.yaml") . | sha256sum }}
     spec:
       containers:
         - name: nginx
