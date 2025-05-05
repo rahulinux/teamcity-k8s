@@ -1,0 +1,35 @@
+teamcity:
+  serverUrl: "https://teamcity-test.duckdns.org"
+  apiToken: "changeme"
+  projects:
+  - id: "Rahul"
+    name: "Rahul"
+    k8sProfile:
+      name: "K8s Profile A"
+      apiServerUrl: "https://kubernetes.default.svc"
+      namespace: "teamcity-agents"
+      # following templateName from podTemplates[].name
+      templateName: "my-template-1"
+      # Maximum number of builds
+      buildsLimit: 2
+      # Parameters available in executor
+      containerParameters:
+        params1: value1
+        params2: value2
+    smokeTest:
+      gitUrl: "https://github.com/octocat/Hello-World.git"
+      command: "ls"
+
+podTemplates:
+  - name: my-template-1
+    template:
+      spec:
+        containers:
+          - name: template-container
+            image: jetbrains/teamcity-agent
+            resources:
+              limits:
+                ephemeral-storage: 25Gi
+                memory: 2Gi
+              requests:
+                ephemeral-storage: 25

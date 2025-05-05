@@ -1,0 +1,56 @@
+main:
+  responsibilities:
+    - "MAIN_NODE"
+    - "CAN_PROCESS_USER_DATA_MODIFICATION_REQUESTS"
+
+secondary:
+  replicas: 1
+  responsibilities:
+    - "CAN_CHECK_FOR_CHANGES"
+    - "CAN_PROCESS_BUILD_TRIGGERS"
+    - "CAN_PROCESS_USER_DATA_MODIFICATION_REQUESTS"
+    - "CAN_PROCESS_BUILD_MESSAGES"
+
+teamcityGlobalConfigurations:
+  dataDirPath: "/storage/data"
+  logDirPathPrefix: "/logs"
+  additionalServerOpts: ""
+  startupProperties: {}
+  xmxValue: 2048m
+  database:
+   existingDatabaseSecret: "shared-db-secret"
+
+storageClass: "longhorn"
+persistence:
+  dataDir:
+    size: 6Gi
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    kubernetes.io/ingress.class: traefik
+    cert-manager.io/cluster-issuer: cert-manager-webhook-duckdns-production
+  hosts:
+    - teamcity-test.duckdns.org
+  tls:
+    - hosts:
+        - teamcity-test.duckdns.org
+      secretName: teamcity-tls
+
+nginx:
+  serverName: teamcity-test.duckdns.org
+
+postgresql:
+  enabled: true
+  fullnameOverride: postgres
+  global:
+    storageClass: "longhorn"
+    postgresql:
+      auth:
+        existingSecret: "shared-db-secret"
+        database: teamcity
+        username: teamcity
+        secretKeys:
+          userPasswordKey: password
+          adminPasswordKey: password
