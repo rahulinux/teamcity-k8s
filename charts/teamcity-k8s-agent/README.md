@@ -1,11 +1,8 @@
 # teamcity-k8s-agent
 
+![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.0](https://img.shields.io/badge/AppVersion-1.0-informational?style=flat-square)
+
 TeamCity Project and Kubernetes Cloud Profile Initializer
-
-Main goal is to automatic register kubernetes cluster with specific project on teamcity server
-Then teamcity will have access to run agent in given namespace.
-
-Other agent provision methods requires manual input like Web UI to authorize agent to join CI.
 
 ## Values
 
@@ -21,15 +18,7 @@ Other agent provision methods requires manual input like Web UI to authorize age
 | rbac.subjectKind | string | `"ServiceAccount"` |  |
 | rbac.subjectName | string | `"teamcity-k8s-sa"` |  |
 | rbac.subjectNamespace | string | `"teamcity-agents"` |  |
-| teamcity.projects[0].id | string | `"projectA"` |  |
-| teamcity.projects[0].k8sProfile.apiServerUrl | string | `"https://kubernetes.default.svc"` |  |
-| teamcity.projects[0].k8sProfile.buildsLimit | int | `2` |  |
-| teamcity.projects[0].k8sProfile.containerParameters.params1 | string | `"value1"` |  |
-| teamcity.projects[0].k8sProfile.containerParameters.params2 | string | `"value2"` |  |
-| teamcity.projects[0].k8sProfile.name | string | `"K8s Profile A"` |  |
-| teamcity.projects[0].k8sProfile.namespace | string | `"teamcity-agents"` |  |
-| teamcity.projects[0].k8sProfile.templateName | string | `"my-template-1"` |  |
-| teamcity.projects[0].name | string | `"Project A"` |  |
+| teamcity.projects | list | `[]` |  |
 | teamcity.serverUrl | string | `"http://ci-teamcity-main.teamcity-cluster.svc.cluster.local:8111"` |  |
 
 ----------------------------------------------
