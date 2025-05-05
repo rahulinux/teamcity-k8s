@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "teamcity.fullname" . }}-server-xml
+  labels:
+    {{- include "teamcity.labels" . | nindent 4 }}
+data:
+  server.xml: |-
+    <Server port="8005" shutdown="SHUTDOWN">
+      <Service name="Catalina">
+        <Connector port="{{ .Values.service.port }}"
+                   protocol="org.apache.coyote.http11.Http11NioProtocol"
+                   address="0.0.0.0"
+                   connectionTimeout="60000"
+                   redirectPort="443"
+                   scheme="https"
+                   proxyPort="443"
+                   secure="true"
+                   useBodyEncodingForURI="true"
+                   maxParameterCount="10000"
+                   maxHttpHeaderSize="1048576"/>
+        <Engine name="Catalina" defaultHost="localhost">
+          <Host name="localhost"  appBase="webapps" unpackWARs="true" autoDeploy="true"/>
+        </Engine>
+      </Service>
+    </Server>
