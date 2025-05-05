@@ -1,0 +1,54 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "teamcity-k8s-agent.fullname" . }}-register
+  labels:
+    {{- include "teamcity-k8s-agent.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "teamcity-k8s-agent.labels" . | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ include "teamcity-k8s-agent.fullname" . }}-sa
+      volumes:
+        - name: scripts-volume
+          configMap:
+            name: {{ include "teamcity-k8s-agent.fullname" . }}-scripts
+      containers:
+        - name: init-teamcity
+          image: python:3.11-slim
+          env:
+            - name: TEAMCITY_URL
+              value: {{ .Values.teamcity.serverUrl | quote }}
+            - name: API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: token
+                  name: "{{ include "teamcity-k8s-agent.name.apiToken" . }}"
+          volumeMounts:
+            - name: scripts-volume
+              mountPath: /scripts
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -xe
+              TOKEN=/var/run/secrets/kubernetes.io/serviceaccount/token
+              CACERT=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+              {{- range .Values.teamcity.projects }}
+              python /scripts/add-project.py \
+                --teamcity-url "$TEAMCITY_URL" \
+                --project-name {{ .name | quote }} \
+                --k8s-profile-name {{ .k8sProfile.name | quote }} \
+                --k8s-api-server-url {{ .k8sProfile.apiServerUrl | quote }} \
+                --k8s-namespace {{ .k8sProfile.namespace | quote }} \
+                --k8s-builds-limit {{ .k8sProfile.buildsLimit | quote }} \
+                --k8s-container-parameters {{ include "joinMap" .k8sProfile.containerParameters | quote }} \
+                --k8s-template-name {{ .k8sProfile.templateName | quote }} \
+                --token-path "$TOKEN" \
+                --cacert-path "$CACERT"
+              {{- end }}

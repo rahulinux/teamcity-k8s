@@ -1,0 +1,47 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "teamcity-k8s-agent.fullname" . }}-smoketest
+  labels:
+    {{- include "teamcity-k8s-agent.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "teamcity-k8s-agent.labels" . | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ include "teamcity-k8s-agent.fullname" . }}-sa
+      volumes:
+        - name: scripts-volume
+          configMap:
+            name: {{ include "teamcity-k8s-agent.fullname" . }}-scripts
+      containers:
+        - name: test-teamcity-build
+          image: python:3.11-slim
+          env:
+            - name: TEAMCITY_URL
+              value: {{ .Values.teamcity.serverUrl | quote }}
+            - name: TEAMCITY_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: token
+                  name: "{{ include "teamcity-k8s-agent.name.apiToken" . }}"
+          volumeMounts:
+            - name: scripts-volume
+              mountPath: /scripts
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -xe
+              {{- with (first .Values.teamcity.projects) }}
+              python /scripts/smoketest.py \
+                --teamcity-url "$TEAMCITY_URL" \
+                --project-name {{ .name | quote }} \
+                --git-url {{ .smokeTest.gitUrl | quote }} \
+                --vcs-root-name {{ .smokeTest.vcsRootName | default "Git" | quote }} \
+                --script-content {{ .smokeTest.command | default "ls -al" | quote }}
+              {{- end }}
