@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "teamcity.fullname" . }}-nginx-config
+  labels:
+    {{- include "teamcity.labels" . | nindent 4 }}
+data:
+  nginx.conf: |-
+    events {
+        worker_connections 10000;
+    }
+    http {
+      upstream main_node {
+         server {{ include "teamcity.name.serviceNameMain" . }}:{{ .Values.service.port }};
+         server {{ include "teamcity.name.serviceNameSecondary" . }}:{{ .Values.service.port }} backup;
+      }
+      upstream secondary_node {
+         server {{ include "teamcity.name.serviceNameSecondary" . }}:{{ .Values.service.port }};
+         server {{ include "teamcity.name.serviceNameMain" . }}:{{ .Values.service.port }} backup;
+      }
+      upstream web_requests {
+         server {{ include "teamcity.name.serviceNameMain" . }}:{{ .Values.service.port }};
+         server {{ include "teamcity.name.serviceNameSecondary" . }}:{{ .Values.service.port }} backup;
+      }
+      map $http_cookie $backend_cookie {
+        default main_node;
+        "~*X-TeamCity-Node-Id-Cookie=(?<node_name>[^;]+)" $node_name;
+      }
+      map $http_user_agent $is_agent {
+        default @users;
+        "~*TeamCity Agent*" @agents;
+      }
+      map $http_upgrade $connection_upgrade {
+        default upgrade;
+        '' '';
+      }
+      proxy_read_timeout     1200;
+      proxy_connect_timeout  240;
+      client_max_body_size   0;
+      server {
+        listen        80;
+        server_name {{ .Values.nginx.serverName }};
+        set $proxy_header_host $host;
+        set $proxy_descr "type=nginx; version=2023.05";
+        location / {
+          try_files /dev/null $is_agent;
+        }
+        location @agents {
+          proxy_pass http://$backend_cookie;
+          proxy_next_upstream error timeout http_503 non_idempotent;
+          proxy_intercept_errors on;
+          proxy_set_header Host $host:$server_port;
+          proxy_redirect off;
+          proxy_set_header X-TeamCity-Proxy $proxy_descr;
+          proxy_set_header X-Forwarded-Host $http_host;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          proxy_set_header X-Forwarded-For $remote_addr;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection $connection_upgrade;
+        }
+        location @users {
+          proxy_pass http://web_requests;
+          proxy_next_upstream error timeout http_503 non_idempotent;
+          proxy_intercept_errors on;
+          proxy_set_header Host $host:$server_port;
+          proxy_redirect off;
+          proxy_set_header X-TeamCity-Proxy $proxy_descr;
+          proxy_set_header X-Forwarded-Host $http_host;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          proxy_set_header X-Forwarded-For $remote_addr;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection $connection_upgrade;
+        }
+      }
+    }
+

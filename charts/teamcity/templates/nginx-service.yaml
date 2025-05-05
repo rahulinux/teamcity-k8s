@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "teamcity.fullname" . }}-nginx
+  labels:
+    {{- include "teamcity.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.nginx.service.port }}
+      targetPort: 80
+  selector:
+    app: {{ include "teamcity.fullname" . }}-nginx
+

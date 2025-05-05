@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "teamcity.fullname" . }}-nginx
+  labels:
+    {{- include "teamcity.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.nginx.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ include "teamcity.fullname" . }}-nginx
+  template:
+    metadata:
+      labels:
+        app: {{ include "teamcity.fullname" . }}-nginx
+    spec:
+      containers:
+        - name: nginx
+          image: {{ .Values.nginx.image.repository | default "nginx" }}:{{ .Values.nginx.image.tag }}
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: {{ include "teamcity.fullname" . }}-nginx-config
+
