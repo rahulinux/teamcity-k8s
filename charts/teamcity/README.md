@@ -1,28 +1,8 @@
 # teamcity
 
-A Helm chart for deploying JetBrains TeamCity Server in Kubernetes
+![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![AppVersion: 2025.03.1](https://img.shields.io/badge/AppVersion-2025.03.1-informational?style=flat-square)
 
-You can configure teamcity self-hosted with following method using this helm chart:
-
-- Method-1: HA: Main and Secondary
-  - Secondary node acts as a passive, read-only standby
-  - Ensures High Availability (failover)
-
-- Method-2: Load-Distributed Nodes 
-  - Multiple nodes with distinct roles (e.g., build queue, VCS polling)
-  - High scalability and flexibility
-
-- Method-3: Main + Secondary (Active with Responsibilities)
-  - Secondary node takes on extra tasks (e.g., build triggering, VCS polling)
-  - Better resource utilization, Load distribution, Easier future scaling
-
-Improvement needed from Jetbrain side:
-- Currently there is manual step to register main and secondary node. 
-  didn't find any documents to automate `“Startup confirmation is required”`
-
-## Pre-requisite
-
-- Storage class with `ReadWriteMany` to shared data volume with main and secondary
+A Helm chart for deploying JetBrains TeamCity in Kubernetes
 
 ## Requirements
 
@@ -56,6 +36,10 @@ Improvement needed from Jetbrain side:
 | main.responsibilities[0] | string | `"MAIN_NODE"` |  |
 | main.responsibilities[1] | string | `"CAN_PROCESS_USER_DATA_MODIFICATION_REQUESTS"` |  |
 | main.tolerations | list | `[]` |  |
+| nginx.image.repository | string | `"nginx"` |  |
+| nginx.image.tag | string | `"1.25"` |  |
+| nginx.serverName | string | `"teamcity-example.com"` |  |
+| nginx.service.port | int | `80` |  |
 | persistence.dataDir.accessMode | string | `"ReadWriteMany"` |  |
 | persistence.dataDir.annotations | object | `{}` |  |
 | persistence.dataDir.size | string | `"4Gi"` |  |
