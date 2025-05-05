@@ -1,9 +1,9 @@
 teamcity:
-  serverUrl: "http://ci-teamcity-main.teamcity-cluster.svc.cluster.local:8111"
+  serverUrl: "https://teamcity-url"
   # Pass API token to automate agent registration
   # apiToken:
   # Or use existing secret
-  # existingApiTokenSecret
+  # existingApiTokenSecret: my-token
   projects: []
   #  - id: "projectA"
   #    name: "Project A"
