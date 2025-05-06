@@ -8,6 +8,10 @@ charts/
 └── teamcity-k8s-agent
 ```
 
+## Architecture
+
+![Architecture](./src/img/teamcity-cluster.svg)
+
 ## [`teamcity`](charts/teamcity)
 
 **A Helm chart for deploying JetBrains TeamCity Server in Kubernetes.**
