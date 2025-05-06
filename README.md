@@ -77,6 +77,17 @@ charts/
 - Check pods status in `teamcity-agents` namespace.
 ---
 
+## TODO
+
+Currently following steps are manual on first time setup for teamcity cluster
+I didn't find any docs on how to automate this yet. 
+
+ - [ ] Automate license agreement accept button
+ - [ ] Automate admin setup
+ - [ ] Automate api token creation with granular permissions to use in agent side 
+ - [ ] Add tests for failover
+ - [ ] Test and document upgrade process
+
 ## Enjoy!
 
 - Scalable, automated TeamCity CI/CD on Kubernetes.
